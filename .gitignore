@@ -7,3 +7,4 @@
 /build/
 .vercel
 /ufv 3
+.env*.local

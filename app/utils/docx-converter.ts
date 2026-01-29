@@ -134,7 +134,7 @@ export async function convertDocxToUniverData(
     body: bodyData.body,
     documentStyle: {
       pageSize: {
-        width: 595.27, // A4 width in points (210mm)
+        width: 900.27, // A4 width in points (210mm)
         height: 841.89, // A4 height in points (297mm)
       },
       marginTop: 72, // 1 inch = 72 points
@@ -776,7 +776,7 @@ async function convertOOXMLToBody(
         }
         if (rPr["w:vertAlign"]?.["@_w:val"]) {
           const va = rPr["w:vertAlign"]["@_w:val"];
-          if (va === "superscript") ts.va = 1;
+          if (va === "superscript") ts.va = 3;
           if (va === "subscript") ts.va = 2;
         }
         if (rPr["w:color"]?.["@_w:val"]) {
