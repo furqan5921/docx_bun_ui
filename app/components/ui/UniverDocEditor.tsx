@@ -13,8 +13,8 @@ import {
   SheetHeader,
   SheetTitle,
 } from "~/components/ui/sheet";
-import { CustomQuickInsertPlugin } from "~/plugins/CustomQuickInsertPlugin";
 import { CursorNavigationPlugin } from "~/plugins/CursorNavigationPlugin";
+import { CustomQuickInsertPlugin } from "~/plugins/CustomQuickInsertPlugin";
 import { HorizontalLineSpacingPlugin } from "~/plugins/HorizontalLineSpacingPlugin";
 import { convertDocxToUniverData } from "~/utils/docx-converter";
 import CustomQuickInsertMenu from "../CustomQuickInsertMenu";
@@ -446,7 +446,30 @@ export function UniverDocEditor({ initialFile }: UniverDocEditorProps) {
               }
             } else {
               console.log("📄 Creating blank document");
-              univerAPI.createUniverDoc({});
+              // Create blank document with TRADITIONAL mode (page view with boundaries)
+              univerAPI.createUniverDoc({
+                body: {
+                  dataStream: "\r\n",
+                  paragraphs: [{ startIndex: 0, paragraphStyle: {} }],
+                  sectionBreaks: [{ startIndex: 1 }],
+                  tables: [],
+                  customBlocks: [],
+                },
+                documentStyle: {
+                  pageSize: { width: 595.27, height: 841.89 }, // A4 size
+                  documentFlavor: 1, // TRADITIONAL - enables page view with boundaries
+                  marginTop: 72,
+                  marginBottom: 72,
+                  marginLeft: 90,
+                  marginRight: 90,
+                  renderConfig: {
+                    vertexAngle: 0,
+                    centerAngle: 0,
+                    background: { rgb: "#FFFFFF" },
+                  },
+                },
+                tableSource: {},
+              });
             }
 
             setTimeout(() => {
@@ -819,7 +842,7 @@ export function UniverDocEditor({ initialFile }: UniverDocEditorProps) {
   };
 
   return (
-    <div className="relative flex h-full flex-col">
+    <div className="relative flex h-full flex-col bg-gray-100">
       <input
         ref={fileInputRef}
         type="file"
@@ -842,126 +865,150 @@ export function UniverDocEditor({ initialFile }: UniverDocEditorProps) {
         />
       )}
 
-      {/* Action buttons - Improved UI */}
-      {!error && !loading && (
-        <div className="absolute top-4 right-20 z-50 flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={triggerFileImport}
-            disabled={importing}
-            className="border-blue-200 hover:bg-blue-50 hover:border-blue-300"
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            {importing ? "Importing..." : "Import DOCX"}
-          </Button>
-          <Button
-            size="sm"
-            onClick={async () => {
-              console.log("[AI Button] Clicked - using Univer's native selection API");
+      {/* Header Toolbar - Production Ready UI */}
+      {!error && (
+        <div className="flex-shrink-0 border-b border-gray-200 bg-white px-4 py-2 shadow-sm">
+          <div className="flex items-center justify-between">
+            {/* Left side - Document info */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <svg className="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm4 18H6V4h7v5h5v11z"/>
+                </svg>
+                <span className="font-medium text-gray-700 text-sm">
+                  {fileName || "Untitled Document"}
+                </span>
+              </div>
+              {importing && (
+                <span className="text-xs text-blue-600 animate-pulse">
+                  Importing...
+                </span>
+              )}
+            </div>
 
-              try {
-                if (!univerAPIRef.current) {
-                  alert("Editor not ready. Please try again.");
-                  return;
-                }
+            {/* Right side - Action buttons */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={triggerFileImport}
+                disabled={importing || loading}
+                className="border-gray-300 hover:bg-gray-50 hover:border-gray-400"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Import
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExport}
+                disabled={loading}
+                className="border-gray-300 hover:bg-gray-50 hover:border-gray-400"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+              <div className="w-px h-6 bg-gray-300 mx-1" />
+              <Button
+                size="sm"
+                onClick={async () => {
+                  console.log("[AI Button] Clicked - using Univer's native selection API");
 
-                // Get the active document from Univer API
-                const activeDoc = univerAPIRef.current.getActiveDocument();
-                if (!activeDoc) {
-                  alert("No active document found.");
-                  return;
-                }
+                  try {
+                    if (!univerAPIRef.current) {
+                      alert("Editor not ready. Please try again.");
+                      return;
+                    }
 
-                // Get document snapshot which contains dataStream
-                const snapshot = activeDoc.getSnapshot();
-                if (!snapshot?.body?.dataStream) {
-                  alert("Document data not available.");
-                  return;
-                }
+                    // Get the active document from Univer API
+                    const activeDoc = univerAPIRef.current.getActiveDocument();
+                    if (!activeDoc) {
+                      alert("No active document found.");
+                      return;
+                    }
 
-                console.log("[AI Button] Document snapshot retrieved");
+                    // Get document snapshot which contains dataStream
+                    const snapshot = activeDoc.getSnapshot();
+                    if (!snapshot?.body?.dataStream) {
+                      alert("Document data not available.");
+                      return;
+                    }
 
-                // Get selection from Univer - use univerAPIRef
-                if (!univerInstanceRef.current) {
-                  alert("Editor not ready.");
-                  return;
-                }
+                    console.log("[AI Button] Document snapshot retrieved");
 
-                const injector = (univerInstanceRef.current as any).__getInjector?.();
-                if (!injector) {
-                  alert("Cannot access editor services.");
-                  return;
-                }
+                    // Get selection from Univer - use univerAPIRef
+                    if (!univerInstanceRef.current) {
+                      alert("Editor not ready.");
+                      return;
+                    }
 
-                const selectionManager = injector.get(DocSelectionManagerService);
-                if (!selectionManager) {
-                  alert("Selection service not available.");
-                  return;
-                }
+                    const injector = (univerInstanceRef.current as any).__getInjector?.();
+                    if (!injector) {
+                      alert("Cannot access editor services.");
+                      return;
+                    }
 
-                const selection = selectionManager.getActiveTextRange();
-                if (!selection) {
-                  alert("Please select some text in the document first.");
-                  return;
-                }
+                    const selectionManager = injector.get(DocSelectionManagerService);
+                    if (!selectionManager) {
+                      alert("Selection service not available.");
+                      return;
+                    }
 
-                // Extract selected text from dataStream
-                const { startOffset, endOffset } = selection;
-                const dataStream = snapshot.body.dataStream;
-                const selectedText = dataStream.substring(startOffset, endOffset);
+                    const selection = selectionManager.getActiveTextRange();
+                    if (!selection) {
+                      alert("Please select some text in the document first.");
+                      return;
+                    }
 
-                console.log("[AI Button] Selected text:", selectedText);
-                console.log("[AI Button] Selection range:", { startOffset, endOffset });
+                    // Extract selected text from dataStream
+                    const { startOffset, endOffset } = selection;
+                    const dataStream = snapshot.body.dataStream;
+                    const selectedText = dataStream.substring(startOffset, endOffset);
 
-                if (selectedText?.trim()) {
-                  // Dispatch AI action event
-                  const event = new CustomEvent("univer:ai-action", {
-                    detail: {
-                      action: "ai-assist",
-                      selectedText: selectedText,
-                      documentId: activeDoc.getId(),
-                      selectionRange: { startOffset, endOffset },
-                      timestamp: Date.now(),
-                    },
-                  });
-                  window.dispatchEvent(event);
-                  console.log("[AI Button] ✓ AI action event dispatched");
-                } else {
-                  alert("Please select some text in the document first.");
-                }
-              } catch (err) {
-                console.error("[AI Button] Error getting selection:", err);
-                alert(
-                  "Unable to capture selected text: " +
-                    (err instanceof Error ? err.message : String(err)),
-                );
-              }
-            }}
-            disabled={loading || !!error}
-            className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white border-0"
-            title="AI Assistant - Select text and click to get AI help"
-          >
-            <svg
-              className="mr-2 h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M8 18h8" />
-            </svg>
-            AI
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            className="border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
+                    console.log("[AI Button] Selected text:", selectedText);
+                    console.log("[AI Button] Selection range:", { startOffset, endOffset });
+
+                    if (selectedText?.trim()) {
+                      // Dispatch AI action event
+                      const event = new CustomEvent("univer:ai-action", {
+                        detail: {
+                          action: "ai-assist",
+                          selectedText: selectedText,
+                          documentId: activeDoc.getId(),
+                          selectionRange: { startOffset, endOffset },
+                          timestamp: Date.now(),
+                        },
+                      });
+                      window.dispatchEvent(event);
+                      console.log("[AI Button] ✓ AI action event dispatched");
+                    } else {
+                      alert("Please select some text in the document first.");
+                    }
+                  } catch (err) {
+                    console.error("[AI Button] Error getting selection:", err);
+                    alert(
+                      "Unable to capture selected text: " +
+                        (err instanceof Error ? err.message : String(err)),
+                    );
+                  }
+                }}
+                disabled={loading || !!error}
+                className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white border-0"
+                title="AI Assistant - Select text and click to get AI help"
+              >
+                <svg
+                  className="mr-2 h-4 w-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2M7.5 13a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3m9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3M8 18h8" />
+                </svg>
+                AI Assistant
+              </Button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1001,11 +1048,12 @@ export function UniverDocEditor({ initialFile }: UniverDocEditorProps) {
           )}
           <div
             key={documentData?.id || "blank"}
-            className="flex-1"
+            className="flex-1 bg-gray-200"
             ref={containerRef}
-            style={{ 
-              overflow: "hidden", 
-              position: "relative"
+            style={{
+              overflow: "auto",
+              position: "relative",
+              backgroundColor: "#e5e7eb", /* Gray background to show page boundaries */
             }}
           />
         </>

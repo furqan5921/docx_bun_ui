@@ -282,43 +282,8 @@ export class CustomQuickInsertService extends Disposable {
 
     let bounds: any = null;
 
-    // Try to get the text range position for the current index
-    // This should give us a more accurate position than paragraph bounds
-    try {
-      const skeleton = docEventManagerService.getSkeleton?.();
-      if (skeleton) {
-        // Try to get position from skeleton
-        const position = skeleton.findPositionByIndex?.(index);
-        console.log(
-          "[CustomQuickInsertService] Skeleton position at index",
-          index,
-          ":",
-          position,
-        );
-
-        if (position && position.position) {
-          const pos = position.position;
-          bounds = {
-            left: pos.startX || pos.x || 0,
-            top: pos.startY || pos.y || 0,
-            bottom: (pos.endY || pos.y || 0) + (pos.height || 20),
-            right: (pos.endX || pos.x || 0) + 10,
-          };
-          console.log(
-            "[CustomQuickInsertService] ✓ Using skeleton position:",
-            bounds,
-          );
-        }
-      }
-    } catch (error) {
-      console.log(
-        "[CustomQuickInsertService] Could not get skeleton position:",
-        error,
-      );
-    }
-
-    // Fallback: Use paragraph bounds and estimate offset based on character distance
-    if (!bounds) {
+    // Use paragraph bounds and estimate offset based on character distance
+    {
       let paragraphBound =
         docEventManagerService.findParagraphBoundByIndex(index);
 

@@ -784,6 +784,7 @@ async function convertOOXMLToBody(
           if (colorVal !== "auto" && colorVal !== "000000") {
             ts.cl = { rgb: `#${colorVal}` };
           }
+          
         }
         if (rPr["w:shd"]?.["@_w:fill"]) {
           const fillVal = rPr["w:shd"]["@_w:fill"];

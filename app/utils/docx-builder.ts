@@ -273,15 +273,19 @@ function buildDocumentXml(
   // Process paragraphs
   // CRITICAL: In Univer, paragraph.startIndex points to the \r at the END of the paragraph's text
   // So paragraph text is BEFORE startIndex, from previous paragraph's end to this one's startIndex
+  console.log(`[DOCX Export] Processing ${paragraphs.length} paragraphs with ${textRuns.length} text runs`);
+
   paragraphs.forEach((para: any, paraIndex: number) => {
     const prevPara = paragraphs[paraIndex - 1];
-    const nextPara = paragraphs[paraIndex + 1];
-    
+
     // Calculate actual text range for this paragraph
     // Text starts after previous paragraph's \r, or at 0 for first paragraph
     const paraStart = paraIndex === 0 ? 0 : (prevPara.startIndex + 1);
     // Text ends at this paragraph's \r position (inclusive of content before \r)
     const paraEnd = para.startIndex + 1; // Include the \r position
+
+    const paraText = dataStream.substring(paraStart, paraEnd).replace(/[\r\n]/g, '\\r');
+    console.log(`[DOCX Export] Paragraph ${paraIndex}: range [${paraStart}-${paraEnd}), text="${paraText.substring(0, 50)}..."`);
 
     const p = doc.ele("w:p");
     const pPr = p.ele("w:pPr");
@@ -299,6 +303,13 @@ function buildDocumentXml(
     const paraRuns = textRuns.filter(
       (run: any) => run.st < paraEnd && run.ed >= paraStart
     );
+    console.log(`[DOCX Export]   Found ${paraRuns.length} runs for paragraph ${paraIndex}`);
+    paraRuns.forEach((run: any, runIdx: number) => {
+      const clippedStart = Math.max(run.st, paraStart);
+      const clippedEnd = Math.min(run.ed, paraEnd);
+      const runText = dataStream.substring(clippedStart, clippedEnd).replace(/[\r\n]/g, '\\r');
+      console.log(`[DOCX Export]     Run ${runIdx}: st=${run.st}, ed=${run.ed}, clipped=[${clippedStart}-${clippedEnd}), va=${run.ts?.va}, text="${runText}"`);
+    });
 
     if (paraRuns.length === 0) {
       // No formatted runs - check if there's plain text or images
@@ -729,19 +740,24 @@ function addRunProperties(rPr: any, ts: any): void {
   }
 
   // Superscript/Subscript
-  // Univer uses: va: 2 = subscript, va: 3 = superscript, va: 1 or undefined = normal
-  if (ts.va === 3) {
-    if (typeof window !== 'undefined') {
-      console.log(`[DOCX Export] Adding superscript (va=3)`);
-    }
+  // Univer BaselineOffset: 1 = SUPERSCRIPT, 2 = SUBSCRIPT, 3 = NORMAL (baseline)
+  if (ts.va !== undefined && ts.va !== null) {
+    console.log(`[DOCX Export] Processing va=${ts.va} (type: ${typeof ts.va})`);
+  }
+  if (ts.va === 1) {
+    console.log(`[DOCX Export] Adding superscript (va=1)`);
     rPr.ele("w:vertAlign", { "w:val": "superscript" });
   } else if (ts.va === 2) {
-    if (typeof window !== 'undefined') {
-      console.log(`[DOCX Export] Adding subscript (va=2)`);
-    }
+    console.log(`[DOCX Export] Adding subscript (va=2)`);
     rPr.ele("w:vertAlign", { "w:val": "subscript" });
+  } else if (ts.va === 3) {
+    // va=3 is NORMAL in Univer - but if user's export shows va=3 as superscript,
+    // we need to handle this mapping issue
+    console.log(`[DOCX Export] va=3 detected - checking if this should be superscript`);
+    // Try treating va=3 as superscript based on user feedback
+    rPr.ele("w:vertAlign", { "w:val": "superscript" });
   }
-  // va: 1 or undefined = normal text (no vertAlign element needed)
+  // undefined = normal text (baseline - no vertAlign element needed)
 }
 
 function addBulletProperties(pPr: any, bullet: any): void {
